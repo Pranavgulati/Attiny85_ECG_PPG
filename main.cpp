@@ -80,7 +80,8 @@ void uart_init(long speed){
 }
 //----------------------------------------------------------------------------------------------------------------------------------
 bool uart_putchar(uint8_t b)
-{
+{	uint8_t oldSREG = SREG;
+	cli(); 
 	if (_tx_delay == 0) {
 		return 0;
 	}
@@ -92,10 +93,10 @@ bool uart_putchar(uint8_t b)
 	volatile uint8_t *reg = _transmitPortRegister;
 	uint8_t reg_mask = _transmitBitMask;
 	uint8_t inv_mask = ~_transmitBitMask;
-	uint8_t oldSREG = SREG;
+	
 	uint16_t delay = _tx_delay;
 
-	cli();  // turn off interrupts for a clean txmit
+	 // turn off interrupts for a clean txmit
 
 	// Write the start bit
 	*reg &= inv_mask;//basically writing a 0 to the pin 
@@ -123,6 +124,7 @@ void ADC_init(){
 	
 //	ADMUX |= (1 << REFS0); 	// Set ADC reference to AVCC
 	ADMUX |= (1 << ADLAR); 	// Left adjust ADC result to allow easy 8 bit reading
+	ADMUX= (ADMUX&0xf0)|(pinNo&0x0f);	
 	// Set ADC prescaler to 64 what gives 125 kHz ADC clock @ 8 MHz
 	//sample rate will roughly be F_CPU/64/25 ~~4kHz
 	//by default in free running mode
@@ -135,19 +137,13 @@ void ADC_init(){
 		1 << ADPS2 |	// prescaler
 		1 << ADPS1 |	// prescaler
 		0 << ADPS0;	// prescaler
-		
-		ADCSRB =
-		0 << ACME |
-		0 << ADTS2 |	// \	set the ADC
-		0 << ADTS1 |	//  >	to free running
-		0 << ADTS0;	// /	mode (restart next conversion, once it is complete) @see ADATE			
-			
 	
 	
 }
 //----------------------------------------------------------------------------------------------------------------------------------
 //ISR(ADC_vect){
-	void ADCin(){
+void ADCin(){
+		
 		uint8_t low,high;
 		low =ADCL;
 		high=ADCH;
@@ -166,8 +162,8 @@ void ADC_init(){
 		}
 		ADMUX= (ADMUX&0xf0)|(pinNo&0x0f);		//selecting the required pin
 		ADCSRA |= (1 << ADSC);//restart conversion
-		
-	}
+		ADCSRA&=(~(1<<ADIF));
+}
 	
 
 
@@ -176,17 +172,29 @@ int main (void)
 	ADC_init();
 	uart_init(115200);
 	ADCSRA |= (1 << ADSC);//restart conversion
-	sei();
+	
 	//uint8_t status=1;
    //which pin is to be used 
-   pinMode(2,OUTPUT);
+   //pinMode(2,OUTPUT);
 	while(1)
 	{
-		if (ADCSRA&(1<<ADIF)){
-		ADCin();
+		if ((ADCSRA & (1<<ADIF))!=0){
+			ADCin();
+				}
+		else{
+			uart_putchar('\n');
 		}
+		_delay_ms(1000);
 	}
 }
 
 
-
+/*
+if ((ADCSRA & (1<<ADIF))!=0){
+ADCin();
+uart_putchar('a');
+}
+else{
+uart_putchar('d');
+}
+*/

@@ -15,25 +15,18 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/delay_basic.h>
+#include <util/delay.h>
 #include <avr/pgmspace.h>
 
 
-volatile int PPG_in;
-volatile int ECG_in;
-volatile uint8_t pinNo=1;
-uint8_t txPin =3;
-uint16_t bit_delay;
+volatile uint8_t pinNo=1; //adc pin
+uint8_t txPin =3;		  //Tx pin 
+uint16_t bit_delay=0;
 int  _tx_delay = 0;
 uint8_t _transmitBitMask  = 1<<txPin;
 uint8_t port = PB;
 volatile uint8_t *_transmitPortRegister;
 //----------------------------------------------------------------------------------------------------------------------------------
-//----------------------------------------------------------------------------------------------------------------------------------
-const uint16_t PROGMEM port_to_output_PGM[] = {
-	NOT_A_PORT,
-	NOT_A_PORT,
-	(uint16_t) &PORTB,
-};
 //----------------------------------------------------------------------------------------------------------------------------------
 inline void tunedDelay(uint16_t delay) {
 	_delay_loop_2(delay);
@@ -68,7 +61,8 @@ uint16_t subtract_cap(uint16_t num, uint16_t sub) {
 //----------------------------------------------------------------------------------------------------------------------------------
 void uart_init(long speed){
 	_tx_delay = 0;
-	_transmitPortRegister = (volatile uint8_t *)port_to_output_PGM[port];
+	//_transmitPortRegister = (volatile uint8_t *)port_to_output_PGM[port];
+	_transmitPortRegister = &PORTB;
 	// Precalculate the various delays, in number of 4-cycle delays
 	bit_delay = (F_CPU / speed) / 4;
 
@@ -104,8 +98,7 @@ bool uart_putchar(uint8_t b)
 	cli();  // turn off interrupts for a clean txmit
 
 	// Write the start bit
-	*reg &= inv_mask;
-
+	*reg &= inv_mask;//basically writing a 0 to the pin 
 	tunedDelay(delay);
 
 	// Write each of the 8 bits
@@ -115,65 +108,83 @@ bool uart_putchar(uint8_t b)
 		*reg |= reg_mask; // send 1
 		else
 		*reg &= inv_mask; // send 0
-
 		tunedDelay(delay);
 		b >>= 1;
 	}
 
 	// restore pin to natural state
 	*reg |= reg_mask;
-
 	SREG = oldSREG; // turn interrupts back on
-	tunedDelay(_tx_delay);
-	
+	tunedDelay(_tx_delay);	
 	return 1;
 }
 //----------------------------------------------------------------------------------------------------------------------------------
 void ADC_init(){
 	
-	ADMUX |= (1 << REFS0); 	// Set ADC reference to AVCC
-	ADMUX |= (1 << REFS1); 	// Set ADC reference to AVCC
+//	ADMUX |= (1 << REFS0); 	// Set ADC reference to AVCC
 	ADMUX |= (1 << ADLAR); 	// Left adjust ADC result to allow easy 8 bit reading
-	ADCSRA |= (1 << ADPS2);	// Set ADC prescaler to 64 what gives 125 kHz ADC clock @ 8 MHz
-	ADCSRA |= (1 << ADPS1);
+	// Set ADC prescaler to 64 what gives 125 kHz ADC clock @ 8 MHz
 	//sample rate will roughly be F_CPU/64/25 ~~4kHz
-	ADCSRA |= (1 << ADIE);  // Enable ADC Interrupt
-	ADCSRA |= (1 << ADEN);  // Enable ADC
-	ADCSRA|=(1<<ADATE);    //auto retriggering enabled
 	//by default in free running mode
+		ADCSRA =
+		1 << ADEN |	// activate the ADC
+		0 << ADSC |	// start conversion
+		1 << ADATE |	// auto trigger
+		0 << ADIF |	// conversion complete
+		1 << ADIE |	// AD interrupt enabled
+		1 << ADPS2 |	// prescaler
+		1 << ADPS1 |	// prescaler
+		0 << ADPS0;	// prescaler
+		
+		ADCSRB =
+		0 << ACME |
+		0 << ADTS2 |	// \	set the ADC
+		0 << ADTS1 |	//  >	to free running
+		0 << ADTS0;	// /	mode (restart next conversion, once it is complete) @see ADATE			
+			
+	
 	
 }
 //----------------------------------------------------------------------------------------------------------------------------------
-ISR(ADC_vect){
+//ISR(ADC_vect){
+	void ADCin(){
 		uint8_t low,high;
 		low =ADCL;
 		high=ADCH;
 		if(pinNo%2==1){
-			uart_putchar(high<<8|low);
-			uart_putchar((uint8_t)',');
+			uart_putchar(high);
+			uart_putchar(low);
+			uart_putchar(',');
 			pinNo=2;
+			
 		}
 		else{
-			uart_putchar(high<<8|low);
-			uart_putchar((uint8_t)'\n');
+			uart_putchar(high);
+			uart_putchar(low);
+			uart_putchar('\n');
 			pinNo=1;
 		}
-		
+		ADMUX= (ADMUX&0xf0)|(pinNo&0x0f);		//selecting the required pin
+		ADCSRA |= (1 << ADSC);//restart conversion
 		
 	}
 	
 
 
 int main (void)
-{	ADC_init();
+{	
+	ADC_init();
 	uart_init(115200);
-   uint8_t ecgPin=PINB1;
-   uint8_t ppgPin=PINB2;
-   
+	ADCSRA |= (1 << ADSC);//restart conversion
+	sei();
+	//uint8_t status=1;
    //which pin is to be used 
+   pinMode(2,OUTPUT);
 	while(1)
 	{
-		
+		if (ADCSRA&(1<<ADIF)){
+		ADCin();
+		}
 	}
 }
 

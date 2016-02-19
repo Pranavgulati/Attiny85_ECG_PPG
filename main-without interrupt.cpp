@@ -5,7 +5,7 @@
  * Author : Pranav
  */ 
 
-#define F_CPU 8000000
+#define F_CPU 8000000UL
 #define NOT_A_PORT 0
 #define PB 2
 #define HIGH 0x1
@@ -18,7 +18,7 @@
 #include <util/delay.h>
 #include <avr/pgmspace.h>
 
-volatile int counter=0;
+
 volatile uint8_t pinNo=1; //adc pin
 uint8_t txPin =3;		  //Tx pin 
 uint16_t bit_delay=0;
@@ -80,7 +80,7 @@ void uart_init(long speed){
 }
 //----------------------------------------------------------------------------------------------------------------------------------
 bool uart_putchar(uint8_t b)
-{//	uint8_t oldSREG = SREG;
+{	uint8_t oldSREG = SREG;
 	cli(); 
 	if (_tx_delay == 0) {
 		return 0;
@@ -115,7 +115,7 @@ bool uart_putchar(uint8_t b)
 
 	// restore pin to natural state
 	*reg |= reg_mask;
-	//SREG = oldSREG; // turn interrupts back on
+	SREG = oldSREG; // turn interrupts back on
 	tunedDelay(_tx_delay);	
 	return 1;
 }
@@ -141,10 +141,9 @@ void ADC_init(){
 	
 }
 //----------------------------------------------------------------------------------------------------------------------------------
-ISR(ADC_vect){
-	cli();
-//void ADCin(){
-		uart_putchar((char)counter++);
+//ISR(ADC_vect){
+void ADCin(){
+		
 		uint8_t low,high;
 		low =ADCL;
 		high=ADCH;
@@ -162,10 +161,8 @@ ISR(ADC_vect){
 			pinNo=1;
 		}
 		ADMUX= (ADMUX&0xf0)|(pinNo&0x0f);		//selecting the required pin
-		sei();
 		ADCSRA |= (1 << ADSC);//restart conversion
-//		ADCSRA&=(~(1<<ADIF));
-		
+		ADCSRA&=(~(1<<ADIF));
 }
 	
 
@@ -174,18 +171,20 @@ int main (void)
 {	
 	ADC_init();
 	uart_init(115200);
-	sei();
 	ADCSRA |= (1 << ADSC);//restart conversion
 	
 	//uint8_t status=1;
    //which pin is to be used 
    //pinMode(2,OUTPUT);
-   	while(1)
+	while(1)
 	{
-		//cli();
-		tunedDelay(10);
-		//sei();
-		tunedDelay(10);
+		if ((ADCSRA & (1<<ADIF))!=0){
+			ADCin();
+				}
+		else{
+			uart_putchar('\n');
+		}
+		_delay_ms(1000);
 	}
 }
 

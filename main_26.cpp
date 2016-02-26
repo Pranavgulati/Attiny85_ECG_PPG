@@ -11,8 +11,8 @@
 #define HIGH 0x1
 #define LOW 0x0
 #define OUTPUT 0x1
-#define SEPARATOR ','
 #define DELIMITER '\n'
+#define SEPARATOR ','
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -20,13 +20,13 @@
 #include <util/delay.h>
 #include <avr/pgmspace.h>
 
-volatile uint8_t pinNo=1; //adc pin
+static volatile uint8_t pinNo=1; //adc pin
 uint8_t txPin =3;		  //Tx pin 
 uint16_t bit_delay=0;
 int  _tx_delay = 0;
 uint8_t _transmitBitMask  = 1<<txPin;
-uint8_t port = PB;
 volatile uint8_t *_transmitPortRegister;
+volatile uint8_t status=1;
 //----------------------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------------------
 inline void tunedDelay(uint16_t delay) {
@@ -124,7 +124,7 @@ bool uart_putchar(uint8_t b)
 void ADC_init(){
 	
 //	ADMUX |= (1 << REFS0); 	// Set ADC reference to AVCC
-	ADMUX |= (0 << ADLAR); 	// Left adjust ADC result to allow easy 8 bit reading
+	ADMUX |= (1 << ADLAR); 	// Left adjust ADC result to allow easy 8 bit reading
 	ADMUX= (ADMUX&0xf0)|(pinNo&0x0f);	
 	// Set ADC prescaler to 64 what gives 125 kHz ADC clock @ 8 MHz
 	//sample rate will roughly be F_CPU/64/25 ~~4kHz
@@ -132,7 +132,7 @@ void ADC_init(){
 		ADCSRA =
 		1 << ADEN |	// activate the ADC
 		0 << ADSC |	// start conversion
-		0 << ADATE |	// auto trigger
+		1 << ADATE |	// auto trigger
 		0 << ADIF |	// conversion complete
 		1 << ADIE |	// AD interrupt enabled
 		1 << ADPS2 |	// prescaler
@@ -141,28 +141,48 @@ void ADC_init(){
 	
 	
 }
+void uart_putString(char inString[]){
+	for(int i=0;i<3;i++){
+		uart_putchar(inString[i]);
+	}
+	
+}
+
 //----------------------------------------------------------------------------------------------------------------------------------
 ISR(ADC_vect){
 	cli();
 //void ADCin(){
+		//uart_putchar((char)pinNo);
+		digitalWrite(2,status%2);
+		status++;
 		uint8_t low,high;
 		low =ADCL;
 		high=ADCH;
-		if(pinNo%2==1){
+		low++;
+		//char highString[3];
+		//{
+			//highString[0]=(high/100)+48;
+			//high=high%100;
+			//highString[1]=(high/10)+48;
+			//high=high%10;
+			//highString[2]=high+48;
+			//
+		//}
+		
+		if(pinNo==1){
 			pinNo=2;
 			uart_putchar(high);
-			uart_putchar(low);
+			//uart_putchar(low);//
 			uart_putchar(SEPARATOR);
-						
 		}
-		else if (pinNo%2==0){
+		else if(pinNo==2){
 			pinNo=1;
 			uart_putchar(high);
-			uart_putchar(low);
+			//uart_putchar(low);
 			uart_putchar(DELIMITER);
 			
 		}
-		ADMUX= (ADMUX&0xf0)|(pinNo&0x0f);		//selecting the required pin
+		ADMUX= (ADMUX&0xf0)|(pinNo);		//selecting the required pin
 		sei();
 		ADCSRA |= (1 << ADSC);//restart conversion
 //		ADCSRA&=(~(1<<ADIF));
@@ -178,15 +198,12 @@ int main (void)
 	sei();
 	ADCSRA |= (1 << ADSC);//restart conversion
 	
-	//uint8_t status=1;
+	
    //which pin is to be used 
-   //pinMode(2,OUTPUT);
+   pinMode(2,OUTPUT);
    	while(1)
 	{
-		//cli();
-		tunedDelay(10);
-		//sei();
-		tunedDelay(10);
+
 	}
 }
 

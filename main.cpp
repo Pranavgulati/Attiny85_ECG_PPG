@@ -13,6 +13,7 @@
 #define OUTPUT 0x1
 #define SEPARATOR ','
 #define DELIMITER '\n'
+#define FREQ_PIN 0
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -144,6 +145,7 @@ void ADC_init(){
 //----------------------------------------------------------------------------------------------------------------------------------
 ISR(ADC_vect){
 	cli();
+	digitalWrite(0,pinNo%2);
 //void ADCin(){
 		uint8_t low,high;
 		low =ADCL;
@@ -177,16 +179,10 @@ int main (void)
 	uart_init(115200);
 	sei();
 	ADCSRA |= (1 << ADSC);//restart conversion
-	
-	//uint8_t status=1;
    //which pin is to be used 
-   //pinMode(2,OUTPUT);
+   pinMode(FREQ_PIN,OUTPUT);
    	while(1)
 	{
-		//cli();
-		tunedDelay(10);
-		//sei();
-		tunedDelay(10);
 	}
 }
 

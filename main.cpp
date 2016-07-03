@@ -14,6 +14,9 @@
 #define SEPARATOR ','
 #define DELIMITER '\n'
 #define FREQ_PIN 0
+#define BIN_2_3_1x 6
+#define BIN_2_3_20x 7
+#define S_1 1
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -21,12 +24,12 @@
 #include <util/delay.h>
 #include <avr/pgmspace.h>
 
-volatile uint8_t pinNo=1; //adc pin
-uint8_t txPin =3;		  //Tx pin 
+volatile uint8_t adcMux=1; //adc pin
+uint8_t txPin =1;		  //Tx pin 
 uint16_t bit_delay=0;
 int  _tx_delay = 0;
 uint8_t _transmitBitMask  = 1<<txPin;
-uint8_t port = PB;
+uint8_t bitState=0;
 volatile uint8_t *_transmitPortRegister;
 //----------------------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------------------
@@ -123,10 +126,9 @@ bool uart_putchar(uint8_t b)
 }
 //----------------------------------------------------------------------------------------------------------------------------------
 void ADC_init(){
-	
-//	ADMUX |= (1 << REFS0); 	// Set ADC reference to AVCC
-	ADMUX |= (0 << ADLAR); 	// Left adjust ADC result to allow easy 8 bit reading
-	ADMUX= (ADMUX&0xf0)|(pinNo&0x0f);	
+	ADMUX|= (1<<REFS0)&(~(1<<ADLAR));
+	ADMUX= (ADMUX&0xf0)|(adcMux&0x0f);
+	ADCSRB|= (1<<IPR)|(1<<BIN);
 	// Set ADC prescaler to 64 what gives 125 kHz ADC clock @ 8 MHz
 	//sample rate will roughly be F_CPU/64/25 ~~4kHz
 	//by default in free running mode
@@ -139,36 +141,40 @@ void ADC_init(){
 		1 << ADPS2 |	// prescaler
 		1 << ADPS1 |	// prescaler
 		0 << ADPS0;	// prescaler
-	
-	
+		DIDR0|= (1<<ADC0D)|(1<<ADC2D)|(1<<ADC3D);
+		ACSR=(0<<ACIE);
+		ACSR=(1<<ACD);
+		
 }
 //----------------------------------------------------------------------------------------------------------------------------------
 ISR(ADC_vect){
 	cli();
-	digitalWrite(0,pinNo%2);
+	digitalWrite(FREQ_PIN,bitState);
+	bitState=~bitState;
 //void ADCin(){
 		uint8_t low,high;
 		low =ADCL;
 		high=ADCH;
-		if(pinNo%2==1){
-			pinNo=2;
+		if(adcMux==BIN_2_3_1x){
+			//do bipolar thing here
+			//PB3 and PB4 are used for bipolar input with PB4 at gnd;
+			adcMux=S_1;
+			ADMUX= (ADMUX&0xf0)|(adcMux&0x0f);
 			uart_putchar(high);
-			uart_putchar(low);
+			uart_putchar(low);			
 			uart_putchar(SEPARATOR);
 						
 		}
-		else if (pinNo%2==0){
-			pinNo=1;
+		else if (adcMux==S_1){
+			adcMux=BIN_2_3_1x;
+			ADMUX= (ADMUX&0xf0)|(adcMux&0x0f);
 			uart_putchar(high);
 			uart_putchar(low);
 			uart_putchar(DELIMITER);
-			
 		}
-		ADMUX= (ADMUX&0xf0)|(pinNo&0x0f);		//selecting the required pin
-		sei();
+		//selecting the required pin
 		ADCSRA |= (1 << ADSC);//restart conversion
-//		ADCSRA&=(~(1<<ADIF));
-		
+		sei();		
 }
 	
 
@@ -176,11 +182,12 @@ ISR(ADC_vect){
 int main (void)
 {	
 	ADC_init();
-	uart_init(115200);
+	uart_init(57600);
+	pinMode(FREQ_PIN,OUTPUT);
 	sei();
 	ADCSRA |= (1 << ADSC);//restart conversion
    //which pin is to be used 
-   pinMode(FREQ_PIN,OUTPUT);
+   
    	while(1)
 	{
 	}

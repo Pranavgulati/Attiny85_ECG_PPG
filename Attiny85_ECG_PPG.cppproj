@@ -38,7 +38,8 @@
         </dependencies>
       </framework-data>
     </AsfFrameworkConfig>
-    <ExternalProgrammingToolCommand>avrdude-arduino</ExternalProgrammingToolCommand>
+    <ExternalProgrammingToolCommand>
+    </ExternalProgrammingToolCommand>
     <avrtool>com.atmel.avrdbg.tool.simulator</avrtool>
     <avrtoolserialnumber />
     <avrdeviceexpectedsignature>0x1E930B</avrdeviceexpectedsignature>

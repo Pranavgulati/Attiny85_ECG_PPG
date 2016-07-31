@@ -7,12 +7,12 @@
 
 #define F_CPU 8000000
 #define NOT_A_PORT 0
-//#define PB 2
+#define PB 2
 #define HIGH 0x1
 #define LOW 0x0
 #define OUTPUT 0x1
-#define SEPARATOR '\n'
-#define DELIMITER 'A'
+#define SEPARATOR ','
+#define DELIMITER '\n'
 #define FREQ_PIN 0
 #define BIN_2_3_1x 6
 #define BIN_2_3_20x 7
@@ -23,9 +23,8 @@
 #include <util/delay_basic.h>
 #include <util/delay.h>
 #include <avr/pgmspace.h>
-#include <stdlib.h>
 
-volatile uint8_t adcMux=1; //adc pin
+volatile uint8_t adcMux=S_1; //adc pin
 uint8_t txPin =1;		  //Tx pin 
 uint16_t bit_delay=0;
 int  _tx_delay = 0;
@@ -122,7 +121,9 @@ bool uart_putchar(uint8_t b)
 	// restore pin to natural state
 	*reg |= reg_mask;
 	//SREG = oldSREG; // turn interrupts back on
-	tunedDelay(_tx_delay);	
+	
+		tunedDelay(_tx_delay);	
+		tunedDelay(_tx_delay);	
 	return 1;
 }
 //----------------------------------------------------------------------------------------------------------------------------------
@@ -148,27 +149,6 @@ void ADC_init(){
 		
 }
 //----------------------------------------------------------------------------------------------------------------------------------
-int signedConvert(unsigned char high, unsigned char low){
-	//converts the 2 bytes of a signed 10bit number with the sign in the first bit
-	int temp = 0;//used for conversion do not change
-	temp = temp | (high & 0x03);
-	temp = temp << 8;
-	temp = temp | low;
-	if (temp>511){ temp = temp - 1024; }
-	return temp;
-
-}
-
-int unsignedConvert(unsigned char high, unsigned low){
-	//converts the 2 bytes of a signed 10bit number with the sign in the first bit
-	int temp = 0;//used for conversion do not change
-	temp = temp | (high & 0x03);
-	temp = temp << 8;
-	temp = temp | low;
-	temp = temp & 0x03FF;
-	return temp;
-}
-
 ISR(ADC_vect){
 	cli();
 	digitalWrite(FREQ_PIN,bitState);
@@ -177,33 +157,22 @@ ISR(ADC_vect){
 		uint8_t low,high;
 		low =ADCL;
 		high=ADCH;
-		char output[5];
 		if(adcMux==BIN_2_3_1x){
 			//do bipolar thing here
 			//PB3 and PB4 are used for bipolar input with PB4 at gnd;
+			uart_putchar(high);
 			adcMux=S_1;
+			uart_putchar(low);			
 			ADMUX= (ADMUX&0xf0)|(adcMux&0x0f);
-			uart_putchar(DELIMITER);		
-			int out = signedConvert(high,low);
-			itoa(out,output,10);
-			for(int i=0;i<4;i++){
-				if(output[i]!='\0'){
-					uart_putchar(output[i]);		
-				}
-			}
-			uart_putchar(SEPARATOR);								
+			uart_putchar(SEPARATOR);
+						
 		}
 		else if (adcMux==S_1){
+			uart_putchar(high);
 			adcMux=BIN_2_3_1x;
+			uart_putchar(low);
 			ADMUX= (ADMUX&0xf0)|(adcMux&0x0f);
-			int out = unsignedConvert(high,low);
-			itoa(out,output,10);
-			for(int i=0;i<4;i++){
-				if(output[i]!='\0'){
-					uart_putchar(output[i]);
-				}
-			}
-			uart_putchar(SEPARATOR);								
+			uart_putchar(DELIMITER);
 		}
 		//selecting the required pin
 		ADCSRA |= (1 << ADSC);//restart conversion
@@ -219,20 +188,8 @@ int main (void)
 	pinMode(FREQ_PIN,OUTPUT);
 	sei();
 	ADCSRA |= (1 << ADSC);//restart conversion
-   //which pin is to be used 
-   
+  
    	while(1)
 	{
 	}
 }
-
-
-/*
-if ((ADCSRA & (1<<ADIF))!=0){
-ADCin();
-uart_putchar('a');
-}
-else{
-uart_putchar('d');
-}
-*/

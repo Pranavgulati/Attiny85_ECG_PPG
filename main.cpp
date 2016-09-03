@@ -11,8 +11,8 @@
 #define HIGH 0x1
 #define LOW 0x0
 #define OUTPUT 0x1
-#define SEPARATOR ','
-#define DELIMITER '\n'
+#define SEPARATOR 0xAA
+#define DELIMITER 'U'
 #define FREQ_PIN 0
 #define BIN_2_3_1x 6
 #define BIN_2_3_20x 7
@@ -40,19 +40,19 @@ inline void tunedDelay(uint16_t delay) {
 inline void pinMode(uint8_t pin, uint8_t mode){
 	//pin can be 0-3 only;
 	//mode 0=input 1 =output
-	if(mode){//input
+	if(mode){//output
 		DDRB=DDRB|(1<<(pin));
 	}
-	else{//output
+	else{//input
 		DDRB=DDRB&(~(1<<(pin)));
 	}
 }
 //----------------------------------------------------------------------------------------------------------------------------------
 inline void digitalWrite(uint8_t pin,uint8_t value){
-	if(value){//LOW
+	if(value){//HIGH
 		PORTB=PORTB|(1<<(pin));
 	}
-	else{//HIGH
+	else{//LOW
 		PORTB=PORTB&(~(1<<(pin)));
 	}
 }
@@ -181,8 +181,7 @@ ISR(ADC_vect){
 	
 
 
-int main (void)
-{	
+int main (void){	
 	ADC_init();
 	uart_init(57600);
 	pinMode(FREQ_PIN,OUTPUT);

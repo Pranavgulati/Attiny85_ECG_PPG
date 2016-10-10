@@ -14,9 +14,9 @@
 #define SEPARATOR 0xAA
 #define DELIMITER 'U'
 #define FREQ_PIN 0
-#define BIN_2_3_1x 6
-#define BIN_2_3_20x 7
-#define S_1 1
+#define BIN_2_3_1x 0x86
+#define BIN_2_3_20x 0x87
+#define S_1 0x91
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -123,13 +123,12 @@ bool uart_putchar(uint8_t b)
 	//SREG = oldSREG; // turn interrupts back on
 	
 		tunedDelay(_tx_delay);	
-		tunedDelay(_tx_delay);	
 	return 1;
 }
 //----------------------------------------------------------------------------------------------------------------------------------
 void ADC_init(){
-	ADMUX|= (1<<REFS1)&(~(1<<ADLAR));
-	ADMUX= (ADMUX&0xf0)|(adcMux&0x0f);
+	//ADMUX|= (1<<REFS1)&(~(1<<ADLAR));
+	//ADMUX= (ADMUX&0xf0)|(adcMux&0x0f);
 	ADCSRB|= (1<<IPR)|(1<<BIN);
 	// Set ADC prescaler to 64 what gives 125 kHz ADC clock @ 8 MHz
 	//sample rate will roughly be F_CPU/64/25 ~~4kHz
@@ -151,7 +150,7 @@ void ADC_init(){
 //----------------------------------------------------------------------------------------------------------------------------------
 ISR(ADC_vect){
 	cli();
-	digitalWrite(FREQ_PIN,bitState);
+	//digitalWrite(FREQ_PIN,bitState);
 	bitState=~bitState;
 //void ADCin(){
 		uint8_t low,high;
@@ -163,7 +162,7 @@ ISR(ADC_vect){
 			uart_putchar(high);
 			adcMux=S_1;
 			uart_putchar(low);			
-			ADMUX= (ADMUX&0xf0)|(adcMux&0x0f);
+			ADMUX= S_1;
 			uart_putchar(SEPARATOR);
 						
 		}
@@ -171,7 +170,7 @@ ISR(ADC_vect){
 			uart_putchar(high);
 			adcMux=BIN_2_3_1x;
 			uart_putchar(low);
-			ADMUX= (ADMUX&0xf0)|(adcMux&0x0f);
+			ADMUX= BIN_2_3_1x;
 			uart_putchar(DELIMITER);
 		}
 		//selecting the required pin
